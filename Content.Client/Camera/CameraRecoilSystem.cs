@@ -31,6 +31,8 @@ public sealed partial class CameraRecoilSystem : SharedCameraRecoilSystem
 
     public override void KickCamera(EntityUid uid, Vector2 recoil, CameraRecoilComponent? component = null)
     {
+        return; // NEOCMU - rmc does hackjobs? we one-up them. disables recoil
+
         if (_intensity == 0)
             return;
 
