@@ -47,7 +47,7 @@ public sealed partial class CCVars
     public const string CrtUiColorDefault = "#46FF8E";
 
     public static readonly CVarDef<bool> CrtUiEnabled =
-        CVarDef.Create("accessibility.crt_ui_enabled", true, CVar.CLIENTONLY | CVar.ARCHIVE);
+        CVarDef.Create("accessibility.crt_ui_enabled", false, CVar.CLIENTONLY | CVar.ARCHIVE); // NEOCMU
 
     public static readonly CVarDef<string> CrtUiColor =
         CVarDef.Create("accessibility.crt_ui_color", CrtUiColorDefault, CVar.CLIENTONLY | CVar.ARCHIVE);
