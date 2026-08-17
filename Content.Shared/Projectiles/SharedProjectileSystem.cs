@@ -149,11 +149,12 @@ public abstract partial class SharedProjectileSystem : EntitySystem
         var filter = Filter.Pvs(coordinates, entityMan: EntityManager);
         if (_guns.GunPrediction)
         {
-            // TODO RMC14 clean this up once gun prediction is using new lag compensation
-            if (TryComp(projectile, out PredictedProjectileServerComponent? serverProjectile) &&
-                serverProjectile.Shooter is { } shooter)
+            // KS14: the shooter's own client already has its own locally-predicted copy of this
+            // projectile (see PredictedProjectileClientSystem/ShotPredictedProjectileEvent), so
+            // exclude them from the networked copy's impact effects to avoid doubling them up.
+            if (component.Shooter is { } shooterUid && TryComp(shooterUid, out ActorComponent? shooterActor))
             {
-                filter = filter.RemovePlayer(shooter);
+                filter = filter.RemovePlayer(shooterActor.PlayerSession);
             }
 
             if (_net.IsServer &&

@@ -8,7 +8,10 @@ using Content.Shared._RMC14.Random;
 using Content.Shared._RMC14.Weapons.Ranged;
 using Content.Shared._RMC14.Weapons.Ranged.Flamer;
 using Content.Shared._RMC14.Weapons.Ranged.Prediction;
+using Content.Shared._RMC14.Movement;
 using Content.Shared._RMC14.Vehicle;
+using Content.Shared.Vehicle;
+using Content.Shared._KS14.Projectiles;
 using Content.Shared.ActionBlocker;
 using Content.Shared.Actions;
 using Content.Shared.Administration.Logs;
@@ -97,6 +100,8 @@ public abstract partial class SharedGunSystem : EntitySystem
     [Dependency] private SharedRMCFlamerSystem _flamer = default!;
     [Dependency] private VehicleWeaponsSystem _rmcVehicleWeapons = default!;
     [Dependency] private RMCSharedWeaponControllerSystem _rmcSharedWeaponController = default!;
+    [Dependency] private SharedRMCLagCompensationSystem _rmcLagCompensation = default!;
+    [Dependency] private VehicleRideSurfaceSystem _rideSurface = default!;
 
     private const float InteractNextFire = 0.3f;
     private const double SafetyNextFire = 0.5;
@@ -110,6 +115,7 @@ public abstract partial class SharedGunSystem : EntitySystem
 
     public override void Initialize()
     {
+        SubscribeAllEvent<RequestShootEvent>(OnShootRequest);
         SubscribeAllEvent<RequestStopShootEvent>(OnStopShootRequest);
         SubscribeLocalEvent<GunComponent, MeleeHitEvent>(OnGunMelee);
 
@@ -157,6 +163,41 @@ public abstract partial class SharedGunSystem : EntitySystem
             component.NextFire = melee.NextAttack;
             DirtyField(uid, component, nameof(GunComponent.NextFire));
         }
+    }
+
+    /// <summary>
+    /// KS14 - handles a client's shoot request directly (both for the client's own local prediction
+    /// replay and the server's authoritative resolution). Replaces the old RMC14 GunPredictionSystem's
+    /// ShootRequested indirection now that shots no longer need per-projectile correlation.
+    /// </summary>
+    private void OnShootRequest(RequestShootEvent ev, EntitySessionEventArgs args)
+    {
+        _rmcLagCompensation.SetLastRealTick(args.SenderSession.UserId, ev.LastRealTick);
+
+        var user = args.SenderSession.AttachedEntity;
+
+        if (user == null ||
+            !_combatMode.IsInCombatMode(user) ||
+            !TryGetGun(user.Value, out var gunEntity, out var gun))
+        {
+            return;
+        }
+
+        if (gunEntity != GetEntity(ev.Gun))
+            return;
+
+        var shootCoordinates = GetCoordinates(ev.Coordinates);
+        var targetUid = GetEntity(ev.Target);
+        if (targetUid is { } clickedTarget)
+        {
+            var mapCoordinates = TransformSystem.ToMapCoordinates(shootCoordinates);
+            if (_rideSurface.TryGetRiderAtCoordinates(clickedTarget, mapCoordinates, out var rider))
+                targetUid = rider;
+        }
+
+        gun.ShootCoordinates = shootCoordinates;
+        gun.Target = targetUid;
+        AttemptShoot(user.Value, gunEntity, gun);
     }
 
     private void OnStopShootRequest(RequestStopShootEvent ev, EntitySessionEventArgs args)
@@ -299,7 +340,7 @@ public abstract partial class SharedGunSystem : EntitySystem
         gun.ShotCounter = 0;
     }
 
-    public List<EntityUid>? AttemptShoot(EntityUid user, EntityUid gunUid, GunComponent gun, List<int>? predictedProjectiles = null, ICommonSession? userSession = null)
+    public List<EntityUid>? AttemptShoot(EntityUid user, EntityUid gunUid, GunComponent gun)
     {
         if (gun.FireRateModified <= 0f ||
             !_actionBlockerSystem.CanAttack(user))
@@ -470,7 +511,7 @@ public abstract partial class SharedGunSystem : EntitySystem
         var userImpulse = false;
         if (Timing.IsFirstTimePredicted)
         {
-            projectiles = Shoot(gunUid, gun, ev.Ammo, fromCoordinates, toCoordinates.Value, out userImpulse, user, throwItems: attemptEv.ThrowItems, predictedProjectiles, userSession);
+            projectiles = Shoot(gunUid, gun, ev.Ammo, fromCoordinates, toCoordinates.Value, out userImpulse, user, throwItems: attemptEv.ThrowItems);
         }
 
         var shotEv = new GunShotEvent(user, ev.Ammo, fromCoordinates, toCoordinates.Value);
@@ -520,9 +561,7 @@ public abstract partial class SharedGunSystem : EntitySystem
         EntityCoordinates toCoordinates,
         out bool userImpulse,
         EntityUid? user = null,
-        bool throwItems = false,
-        List<int>? predictedProjectiles = null,
-        ICommonSession? userSession = null)
+        bool throwItems = false)
     {
         userImpulse = true;
 
@@ -557,27 +596,6 @@ public abstract partial class SharedGunSystem : EntitySystem
         // DebugTools.Assert(direction != Vector2.Zero);
         var shotProjectiles = new List<EntityUid>(ammo.Count);
 
-        void MarkPredicted(EntityUid projectile, int index)
-        {
-            if (!GunPrediction)
-                return;
-
-            if (predictedProjectiles == null || userSession == null)
-                return;
-
-            if (predictedProjectiles.TryGetValue(index, out var predicted))
-            {
-                var comp = new PredictedProjectileServerComponent
-                {
-                    Shooter = userSession,
-                    ClientId = predicted,
-                    ClientEnt = user,
-                };
-                AddComp(projectile, comp, true);
-                Dirty(projectile, comp);
-            }
-        }
-
         foreach (var (ent, shootable) in ammo)
         {
             // pneumatic cannon doesn't shoot bullets it just throws them, ignore ammo handling
@@ -601,7 +619,6 @@ public abstract partial class SharedGunSystem : EntitySystem
 
                             if (_netManager.IsClient && HasComp<GunIgnorePredictionComponent>(gunUid))
                             {
-                                predictedProjectiles?.RemoveAll(i => i == uid.Id);
                                 QueueDel(uid);
                             }
 
@@ -657,7 +674,6 @@ public abstract partial class SharedGunSystem : EntitySystem
 
                     if (_netManager.IsClient)
                         RemoveShootable(ent!.Value);
-                    MarkPredicted(ent!.Value, 0);
                     break;
                 case HitscanPrototype hitscan:
                     EntityUid? lastHit = null;
@@ -783,8 +799,6 @@ public abstract partial class SharedGunSystem : EntitySystem
 
         void CreateAndFireProjectiles(EntityUid ammoEnt, AmmoComponent ammoComp)
         {
-            predictedProjectiles ??= new List<int>();
-            MarkPredicted(ammoEnt, 0);
             if (TryComp<ProjectileSpreadComponent>(ammoEnt, out var ammoSpreadComp))
             {
                 var spreadEvent = new GunGetAmmoSpreadEvent(ammoSpreadComp.Spread);
@@ -801,7 +815,6 @@ public abstract partial class SharedGunSystem : EntitySystem
                     var newuid = Spawn(ammoSpreadComp.Proto, fromEnt);
                     ShootOrThrow(newuid, angles[i].ToVec(), gunVelocity, gun, gunUid, user);
                     shotProjectiles.Add(newuid);
-                    MarkPredicted(newuid, i);
                 }
             }
             else
@@ -948,9 +961,6 @@ public abstract partial class SharedGunSystem : EntitySystem
         // 1. Entity specific sound
         // 2. Ammo's sound
         // 3. Nothing
-        if (_netManager.IsClient && HasComp<PredictedProjectileServerComponent>(projectile))
-            return;
-
         filter ??= Filter.Pvs(otherEntity);
         var playedSound = false;
 
@@ -1008,6 +1018,13 @@ public abstract partial class SharedGunSystem : EntitySystem
             Projectiles.SetShooter(uid, projectile, shooter.Value);
 
         TransformSystem.SetWorldRotationNoLerp(uid, direction.ToWorldAngle() + projectile.Angle);
+
+        // KS14 - lets LagCompProjectileSystem spawn rewound hit-detection ghosts for this shot.
+        if (user is { } userUid)
+        {
+            var shotEv = new PlayerShotProjectileEvent(uid, userUid);
+            RaiseLocalEvent(ref shotEv);
+        }
     }
 
     protected abstract void Popup(string message, EntityUid? uid, EntityUid? user);
