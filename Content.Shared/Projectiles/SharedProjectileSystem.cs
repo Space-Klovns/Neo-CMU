@@ -103,8 +103,7 @@ public abstract partial class SharedProjectileSystem : EntitySystem
         var (uid, component, ourBody) = projectile;
         if (projectile.Comp1.ProjectileSpent)
         {
-            if (_net.IsServer && component.DeleteOnCollide)
-                QueueDel(uid);
+            PredictedQueueDel(uid);
 
             return;
         }
@@ -125,25 +124,18 @@ public abstract partial class SharedProjectileSystem : EntitySystem
 
         var coordinates = Transform(projectile).Coordinates;
         var otherName = ToPrettyString(target);
-        var modifiedDamage = _net.IsServer
-            ? _damageableSystem.TryChangeDamage(target,
-                ev.Damage,
-                component.IgnoreResistances,
-                origin: component.Shooter,
-                tool: uid)
-            : new DamageSpecifier(ev.Damage);
+        var modifiedDamage = _damageableSystem.TryChangeDamage(
+            target,
+            ev.Damage,
+            component.IgnoreResistances,
+            origin: component.Shooter,
+            tool: uid
+        );
+
         var deleted = Deleted(target);
 
-        // RMC14 this is already done on the server in TryChangeDamage.
-        if (_net.IsClient)
-        {
-            var modifyEvent = new DamageModifyEvent(ev.Damage, component.Shooter, uid);
-            RaiseLocalEvent(target, modifyEvent);
-            modifiedDamage = modifyEvent.Damage;
-        }
-
         var popupEv = new ProjectileDamageDealtEvent(component.Shooter, modifiedDamage);
-            RaiseLocalEvent(target, ref popupEv);
+        RaiseLocalEvent(target, ref popupEv);
         //
 
         var filter = Filter.Pvs(coordinates, entityMan: EntityManager);
@@ -240,8 +232,8 @@ public abstract partial class SharedProjectileSystem : EntitySystem
         var additionalHits = new AfterProjectileHitEvent(projectile, target);
         RaiseLocalEvent(uid, ref additionalHits);
 
-        if (!predicted && component.DeleteOnCollide && (_net.IsServer || IsClientSide(uid)))
-            QueueDel(uid);
+        if (component.DeleteOnCollide)
+            PredictedQueueDel(uid);
 
         else if (_net.IsServer && component.DeleteOnCollide)
         {
@@ -294,7 +286,7 @@ public abstract partial class SharedProjectileSystem : EntitySystem
             return reagent.SubstanceColor;
         }
 
-        return Color.Red;
+        return Color.Maroon;
     }
 
     private void OnEmbedActivate(Entity<EmbeddableProjectileComponent> embeddable, ref ActivateInWorldEvent args)
