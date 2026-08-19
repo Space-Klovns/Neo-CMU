@@ -1,9 +1,7 @@
-using System.Linq;
 using System.Numerics;
 using Content.Client._RMC14.ItemPickup;
 using Content.Client._RMC14.Movement;
 using Content.Client._RMC14.Vehicle;
-using Content.Client._RMC14.Weapons.Ranged.Prediction;
 using Content.Client.Animations;
 using Content.Client.Gameplay;
 using Content.Client.Items;
@@ -45,7 +43,6 @@ public sealed partial class GunSystem : SharedGunSystem
 
     // RMC14
     [Dependency] private ItemPickupSystem _itemPickup = default!;
-    [Dependency] private GunPredictionSystem _gunPrediction = default!;
     [Dependency] private RMCLagCompensationSystem _rmcLagCompensation = default!;
     [Dependency] private VehicleTurretMuzzleOffsetSystem _vehicleTurretMuzzleOffset = default!;
 
@@ -212,7 +209,7 @@ public sealed partial class GunSystem : SharedGunSystem
         if (_state.CurrentState is GameplayStateBase screen)
             target = GetNetEntity(screen.GetClickedEntity(mousePos));
 
-        if (_player.LocalSession is not { } session)
+        if (_player.LocalSession is null)
             return;
 
         if (_itemPickup.RecentItemPickUp)
@@ -220,14 +217,11 @@ public sealed partial class GunSystem : SharedGunSystem
 
         Log.Debug($"Sending shoot request tick {Timing.CurTick} / {Timing.CurTime}");
 
-        var projectiles = _gunPrediction.ShootRequested(GetNetEntity(gunUid), GetNetCoordinates(coordinates), target, null, session);
-
         RaisePredictiveEvent(new RequestShootEvent()
         {
             Target = target,
             Coordinates = GetNetCoordinates(coordinates),
             Gun = GetNetEntity(gunUid),
-            Shot = projectiles?.Select(e => e.Id).ToList(),
             LastRealTick = _rmcLagCompensation.GetLastRealTick(null),
         });
     }

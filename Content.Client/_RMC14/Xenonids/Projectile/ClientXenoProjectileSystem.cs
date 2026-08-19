@@ -1,4 +1,4 @@
-using Content.Client._RMC14.Weapons.Ranged.Prediction;
+using Content.Shared._RMC14.Weapons.Ranged.Prediction;
 using Content.Shared._RMC14.Xenonids.Projectile;
 using Robust.Client.GameObjects;
 using Robust.Client.Physics;
@@ -8,7 +8,7 @@ namespace Content.Client._RMC14.Xenonids.Projectile;
 
 public sealed partial class ClientXenoProjectileSystem : EntitySystem
 {
-    [Dependency] private GunPredictionSystem _gunPrediction = default!;
+    [Dependency] private SharedGunPredictionSystem _gunPrediction = default!;
     [Dependency] private IPlayerManager _player = default!;
     [Dependency] private SpriteSystem _sprite = default!;
 
