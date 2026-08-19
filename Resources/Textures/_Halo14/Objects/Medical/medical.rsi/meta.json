@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "license": "CC-BY-SA-3.0",
+  "copyright": "Taken from cmss13 halo PVE at https://github.com/cmss13-devs/cmss13-pve-halo/blob/master/icons/halo/obj/items/medical.dmi",
+  "size": {
+    "x": 32,
+    "y": 32
+  },
+  "states": [
+    {
+      "name": "biofoam"
+    },
+    {
+      "name": "biofoam_primed"
+    },
+    {
+      "name": "biofoam_spent"
+    }
+  ]
+}

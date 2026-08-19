@@ -1,0 +1,41 @@
+- type: entity
+  parent: BaseItem
+  id: HALO_BiofoamCanister
+  name: biofoam canister
+  description: An olive-drab canister full of a stabilizing biomedical polymer foam, otherwise known as biofoam. Fold open the injection rod to prime it, then stick it into your target's wounds.
+  components:
+  - type: Sprite
+    sprite: _Halo14/Objects/Medical/medical.rsi
+    layers:
+    - state: biofoam
+  - type: Item
+    sprite: null
+  - type: SpawnItemsOnUse
+    items:
+    - id: HALO_BiofoamCanisterPrimed
+    sound:
+      path: /Audio/_Halo14/Items/unfold.ogg
+
+- type: entity
+  parent: CMAutoInjector
+  id: HALO_BiofoamCanisterPrimed
+  name: biofoam canister
+  description: An olive-drab canister full of a stabilizing biomedical polymer foam, otherwise known as biofoam. Fold open the injection rod to prime it, then stick it into your target's wounds.
+  suffix: primed
+  components:
+  - type: Sprite
+    sprite: _Halo14/Objects/Medical/medical.rsi
+    layers:
+    - state: biofoam_primed
+  - type: Item
+    sprite: null
+  - type: Hypospray
+    transferAmount: 20
+    injectSound: /Audio/_Halo14/Items/biofoam.ogg
+  - type: SolutionContainerManager
+    solutions:
+      pen:
+        maxVol: 20
+        reagents:
+        - ReagentId: HALO_Biofoam
+          Quantity: 20
