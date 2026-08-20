@@ -1,4 +1,6 @@
 using System.Linq;
+using System.Numerics;
+using Content.Server._KS14.NPC.Queries.Considerations;
 using Content.Server._RMC14.NPC;
 using Content.Server.Fluids.EntitySystems;
 using Content.Server.Hands.Systems;
@@ -22,6 +24,9 @@ using Content.Shared._RMC14.Xenonids.Parasite;
 using Content.Shared.Atmos.Components;
 using Content.Shared._RMC14.Sentry;
 using Content.Shared.Chemistry.EntitySystems;
+using Content.Shared.Containers.ItemSlots;
+using Content.Shared.Chemistry.Components;
+using Content.Shared.Chemistry.Components.SolutionManager;
 using Content.Shared.Damage;
 using Content.Shared.Examine;
 using Content.Shared.Fluids.Components;
@@ -39,10 +44,13 @@ using Content.Shared.Turrets;
 using Content.Shared.Weapons.Melee;
 using Content.Shared.Weapons.Ranged.Components;
 using Content.Shared.Weapons.Ranged.Events;
+using Content.Shared.Weapons.Ranged.Systems;
 using Content.Shared.Whitelist;
 using Microsoft.Extensions.ObjectPool;
 using Robust.Server.Containers;
 using Robust.Shared.Prototypes;
+using Robust.Shared.Random;
+using Robust.Shared.Map;
 using Robust.Shared.Utility;
 
 namespace Content.Server.NPC.Systems;
@@ -73,6 +81,8 @@ public sealed partial class NPCUtilitySystem : EntitySystem
     [Dependency] private TurretTargetSettingsSystem _turretTargetSettings = default!;
     [Dependency] private RMCInteractionSystem _rmcInteraction = default!;
     [Dependency] private StandingStateSystem _standing = default!;
+    [Dependency] private IRobustRandom _random = default!;
+    [Dependency] private ItemSlotsSystem _itemSlotsSystem = default!;
 
     private EntityQuery<PuddleComponent> _puddleQuery;
     private EntityQuery<TransformComponent> _xformQuery;
@@ -279,20 +289,14 @@ public sealed partial class NPCUtilitySystem : EntitySystem
             case TargetAmmoMatchesCon:
             {
                 if (!blackboard.TryGetValue(NPCBlackboard.ActiveHand, out string? activeHand, EntityManager) ||
-                    !_hands.TryGetHeldItem(owner, activeHand, out var heldEntity) ||
-                    !TryComp<BallisticAmmoProviderComponent>(heldEntity, out var heldGun))
+                    !_hands.TryGetHeldItem(owner, activeHand, out var heldGun) ||
+                    !_itemSlotsSystem.TryGetSlot(heldGun.Value, SharedGunSystem.MagazineSlot, out var magazineSlot))
                 {
                     return 0f;
                 }
 
-                if (_whitelistSystem.IsWhitelistFailOrNull(heldGun.Whitelist, targetUid))
-                {
-                    return 0f;
-                }
-
-                return 1f;
-            }
-            case TargetDistanceCon:
+                return _whitelistSystem.IsWhitelistFailOrNull(magazineSlot.Whitelist, targetUid) ? 0f : 1f;
+            }            case TargetDistanceCon:
             {
                 var radius = blackboard.GetValueOrDefault<float>(blackboard.GetVisionRadiusKey(EntityManager), EntityManager);
 
@@ -462,6 +466,53 @@ public sealed partial class NPCUtilitySystem : EntitySystem
             {
                 return !TryComp<XenoBurrowComponent>(targetUid, out var burrow) || !burrow.Active ? 1f : 0f;
             }
+            case CoordinatesInFOVCon con:
+            {
+                if (!blackboard.TryGetValue<EntityCoordinates>(con.ReferenceCoordinatesKey, out var reference, EntityManager) ||
+                    !TryComp(owner, out TransformComponent? ownerTransform) ||
+                    !TryComp(targetUid, out TransformComponent? targetTransform))
+                    return 0f;
+
+                var forward = _transform.GetWorldPosition(targetTransform) - _transform.GetWorldPosition(ownerTransform);
+                var toReference = _transform.ToWorldPosition(reference) - _transform.GetWorldPosition(ownerTransform);
+                if (forward.LengthSquared() == 0f || toReference.LengthSquared() == 0f)
+                    return 0f;
+
+                var dot = Vector2.Dot(Vector2.Normalize(forward), Vector2.Normalize(toReference));
+                return dot >= MathF.Cos(MathF.PI * con.Angle / 360f) ? 1f : 0f;
+            }
+            case CoordinatesInLOSCon con:
+            {
+                if (!blackboard.TryGetValue<EntityCoordinates>(con.ToKey, out var coordinates, EntityManager))
+                    return 0f;
+
+                return _examine.InRangeUnOccluded(targetUid, coordinates, con.Radius + 0.5f, null) ? 1f : 0f;
+            }
+            case HasSolutionCon:
+                return HasComp<SolutionContainerManagerComponent>(targetUid) || HasComp<SolutionComponent>(targetUid) ? 1f : 0f;
+            case KeyCoordinatesDistanceCon con:
+            {
+                if (!blackboard.TryGetValue<EntityCoordinates>(con.Key, out var coordinates, EntityManager) ||
+                    !TryComp(targetUid, out TransformComponent? transform) ||
+                    !coordinates.TryDistance(EntityManager, _transform, transform.Coordinates, out var distance))
+                    return 0f;
+
+                var radius = blackboard.GetValueOrDefault<float>(blackboard.GetVisionRadiusKey(EntityManager), EntityManager);
+                return radius > 0f ? Math.Clamp(distance / radius, 0f, 1f) : 0f;
+            }
+            case KeyEntityDistanceCon con:
+            {
+                if (!blackboard.TryGetValue<EntityUid>(con.Key, out var keyUid, EntityManager) ||
+                    !TryComp(keyUid, out TransformComponent? keyTransform) ||
+                    !TryComp(targetUid, out TransformComponent? targetTransform) ||
+                    !keyTransform.Coordinates.TryDistance(EntityManager, _transform, targetTransform.Coordinates, out var distance))
+                    return 0f;
+
+                var radius = blackboard.GetValueOrDefault<float>(blackboard.GetVisionRadiusKey(EntityManager), EntityManager);
+                return radius > 0f ? Math.Clamp(distance / radius, 0f, 1f) : 0f;
+            }
+            case RandomValueCon con:
+                return _random.NextFloat() < con.Probability ? 1f : 0f;
             default:
                 throw new NotImplementedException();
         }

@@ -177,6 +177,10 @@ public sealed partial class NPCCombatSystem
             var mapVelocity = targetBody.LinearVelocity;
             var targetSpot = targetPos + mapVelocity * distance / ShootSpeed;
 
+            // PvE tuning: grunts may deliberately scatter shots while elite units can use 0.
+            if (comp.Inaccuracy > 0f && _random.NextFloat() < comp.Inaccuracy)
+                targetSpot += _random.NextVector2(-MathF.Max(0.25f, distance * 0.08f), MathF.Max(0.25f, distance * 0.08f));
+
             // If we have a max rotation speed then do that.
             var goalRotation = (targetSpot - worldPos).ToWorldAngle();
             var rotationSpeed = comp.RotationSpeed;

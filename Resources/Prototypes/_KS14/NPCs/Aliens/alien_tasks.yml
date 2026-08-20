@@ -1,0 +1,58 @@
+# Command-first roots for the PvE roster. These preserve CM's caste-specific combat
+# tree while adding the Klovn HTN command, memory, and movement behavior around it.
+- type: htnCompound
+  id: KsAlienCommandableCompound
+  branches:
+  - preconditions:
+    - !type:KeyExistsPrecondition
+      key: FollowTarget
+    tasks:
+    - !type:HTNCompoundTask
+      task: MoveToCoordinatesCompound
+  - tasks:
+    - !type:HTNCompoundTask
+      task: CMXenoCompound
+
+- type: htnCompound
+  id: KsMarineCommandableCompound
+  branches:
+  - preconditions:
+    - !type:KeyExistsPrecondition
+      key: FollowTarget
+    tasks:
+    - !type:HTNCompoundTask
+      task: MoveToCoordinatesCompound
+  - tasks:
+    - !type:HTNCompoundTask
+      task: KsOperativeRangedCombatCompound
+  - tasks:
+    - !type:HTNCompoundTask
+      task: MeleeCombatCompound
+
+# Mirrors the KS operative weapon workflow without dialogue branches.
+- type: htnCompound
+  id: KsMarineRangedCombatCompound
+  branches:
+  - preconditions:
+    - !type:ActiveHandComponentPrecondition
+      components:
+      - type: Gun
+    - !type:GunAmmoPrecondition
+      minPercent: 0.001
+    - !type:NeedToRackBoltPrecondition
+    tasks:
+    - !type:HTNPrimitiveTask
+      operator: !type:RackBoltOperator
+  - preconditions:
+    - !type:ActiveHandComponentPrecondition
+      components:
+      - type: Gun
+    - !type:GunAmmoPrecondition
+      minPercent: 0.001
+    - !type:CanWieldPrecondition
+    tasks:
+    - !type:HTNPrimitiveTask
+      operator: !type:WieldOperator
+  - tasks:
+    - !type:HTNCompoundTask
+      task: RangedCombatCompound

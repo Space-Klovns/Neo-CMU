@@ -1,0 +1,72 @@
+# AI overlays for every standard xenomorph caste. The source caste keeps its
+# abilities and visuals; this layer supplies HTN planning and commander selection.
+- type: entity
+  parent: CMXenoLarva
+  id: KsAiXenoLarva
+  components: &ks_ai_xeno
+  - type: FieldCommandable
+  - type: NpcSensors
+  - type: HTN
+    rootTask:
+      task: KsAlienCommandableCompound
+
+- type: entity
+  parent: CMXenoDrone
+  id: KsAiXenoDrone
+  components: *ks_ai_xeno
+- type: entity
+  parent: CMXenoCarrier
+  id: KsAiXenoCarrier
+  components: *ks_ai_xeno
+- type: entity
+  parent: CMXenoHivelord
+  id: KsAiXenoHivelord
+  components: *ks_ai_xeno
+- type: entity
+  parent: CMXenoBoiler
+  id: KsAiXenoBoiler
+  components: *ks_ai_xeno
+- type: entity
+  parent: CMXenoDefender
+  id: KsAiXenoDefender
+  components: *ks_ai_xeno
+- type: entity
+  parent: CMXenoBurrower
+  id: KsAiXenoBurrower
+  components: *ks_ai_xeno
+- type: entity
+  parent: CMXenoPraetorian
+  id: KsAiXenoPraetorian
+  components: *ks_ai_xeno
+- type: entity
+  parent: CMXenoQueen
+  id: KsAiXenoQueen
+  components: *ks_ai_xeno
+- type: entity
+  parent: CMXenoCrusherBase
+  id: KsAiXenoCrusher
+  components: *ks_ai_xeno
+- type: entity
+  parent: CMXenoRavager
+  id: KsAiXenoRavager
+  components: *ks_ai_xeno
+- type: entity
+  parent: CMXenoLurker
+  id: KsAiXenoLurker
+  components: *ks_ai_xeno
+- type: entity
+  parent: CMXenoRunner
+  id: KsAiXenoRunner
+  components: *ks_ai_xeno
+- type: entity
+  parent: CMXenoSentinel
+  id: KsAiXenoSentinel
+  components: *ks_ai_xeno
+- type: entity
+  parent: CMXenoSpitter
+  id: KsAiXenoSpitter
+  components: *ks_ai_xeno
+- type: entity
+  parent: CMXenoWarrior
+  id: KsAiXenoWarrior
+  components: *ks_ai_xeno

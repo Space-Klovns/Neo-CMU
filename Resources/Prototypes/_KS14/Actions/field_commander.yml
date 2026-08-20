@@ -1,0 +1,35 @@
+- type: entity
+  parent: BaseToggleAction
+  id: KsFcActionToggleSelection
+  name: Toggle unit selection
+  description: While enabled, drag with the primary mouse button to select units.
+  components:
+  - type: Action
+    checkCanInteract: false
+  - type: InstantAction
+    event: !type:FieldCommanderToggleSelectionEvent
+
+- type: entity
+  parent: BaseAction
+  id: KsFcActionMoveSelection
+  name: Order selected units
+  description: Move the selected units in a compact formation.
+  components:
+  - type: Action
+    checkCanInteract: false
+  - type: TargetAction
+    range: -1
+    checkCanAccess: false
+  - type: WorldTargetAction
+    event: !type:FieldCommanderMoveOrderEvent
+
+- type: entity
+  parent: BaseAction
+  id: KsFcActionClearSelection
+  name: Clear selected units
+  description: Deselect every currently selected unit.
+  components:
+  - type: Action
+    checkCanInteract: false
+  - type: InstantAction
+    event: !type:FieldCommanderClearSelectionEvent

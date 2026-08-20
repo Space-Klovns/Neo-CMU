@@ -1,0 +1,95 @@
+using Content.Server._KS14.NPC.Components;
+using Content.Server.Explosion.EntitySystems;
+using Content.Shared._KS14.NPC.Systems;
+using Robust.Shared.Map;
+
+namespace Content.Server._KS14.NPC.Systems;
+
+public sealed partial class NpcSensorSystem : SharedNpcSensorSystem
+{
+    [Dependency] private EntityLookupSystem _lookupSystem = default!;
+
+    [Dependency] private EntityQuery<NpcSensorsComponent> _sensorsQuery = default!;
+
+    private const string DisturbanceCoordinatesSensorKey = "__Sensor__Disturbance.TargetCoordinates";
+
+    public override void Initialize()
+    {
+        base.Initialize();
+
+        SubscribeLocalEvent<NpcDisturbOnTriggerComponent, TriggerEvent>(OnTrigger);
+    }
+
+    private void OnTrigger(Entity<NpcDisturbOnTriggerComponent> entity, ref TriggerEvent args)
+    {
+        EntityCoordinates coordinates;
+        if (entity.Comp.TargetUser)
+        {
+            if (args.User is not { } userUid)
+                return;
+
+            coordinates = Transform(userUid).Coordinates;
+        }
+        else
+            coordinates = Transform(entity.Owner).Coordinates;
+
+        DoDisturbance(coordinates, entity.Comp.Radius);
+    }
+
+    public void TryImmediatelyUpdatePlan(EntityUid uid)
+    {
+        // ack
+        // TODO LCDC: TODO ANK2: fix
+        // if (!TryComp<HTNComponent>(uid, out var htnComponent) ||
+        //     !htnComponent.Enabled ||
+        //     htnComponent.Planning ||
+        //     htnComponent.Plan is { })
+        //     return;
+
+        // _npcSystem.WakeNPC(uid, htnComponent);
+        // _htnSystem.Replan(htnComponent);
+    }
+
+    public void AddEffect(Entity<NpcSensorsComponent?> entity, string key, object value)
+    {
+        if (!_sensorsQuery.Resolve(entity.Owner, ref entity.Comp))
+            return;
+
+        entity.Comp.AggregatedEffects[key] = value;
+        TryImmediatelyUpdatePlan(entity.Owner);
+    }
+
+    public void AddEffects(Entity<NpcSensorsComponent?> entity, IEnumerable<(string, object)> effects)
+    {
+        if (!_sensorsQuery.Resolve(entity.Owner, ref entity.Comp))
+            return;
+
+        foreach (var (key, value) in effects)
+            entity.Comp.AggregatedEffects[key] = value;
+
+        TryImmediatelyUpdatePlan(entity.Owner);
+    }
+
+    public void AddEffects(Entity<NpcSensorsComponent?> entity, Dictionary<string, object> effects)
+    {
+        if (!_sensorsQuery.Resolve(entity.Owner, ref entity.Comp))
+            return;
+
+        foreach (var (key, value) in effects)
+            entity.Comp.AggregatedEffects[key] = value;
+
+        TryImmediatelyUpdatePlan(entity.Owner);
+    }
+
+    public override void DoDisturbance(EntityCoordinates coordinates, float radius, EntityUid? source = null)
+    {
+        var entities = _lookupSystem.GetEntitiesInRange<NpcSensorsComponent>(coordinates, radius, flags: LookupFlags.Approximate | LookupFlags.Sundries | LookupFlags.Dynamic | LookupFlags.Uncontained);
+        foreach (var entity in entities)
+        {
+            if (entity.Owner == source)
+                continue;
+
+            AddEffect(entity!, DisturbanceCoordinatesSensorKey, coordinates);
+        }
+    }
+}

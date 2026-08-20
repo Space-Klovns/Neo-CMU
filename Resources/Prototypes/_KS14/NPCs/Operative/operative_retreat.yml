@@ -1,0 +1,53 @@
+
+# Doesn't actually fail if it can't find somewhere to retreat to
+- type: htnCompound
+  id: KsOperativeTryRetreatCompound
+  branches:
+  - tasks:
+    - !type:HTNPrimitiveTask
+        operator: !type:UtilityOperator
+          proto: KsOperativeRetreatableCampingMarkers # preferably not towards the target
+          key: RetreatTarget
+          keyCoordinates: RetreatTargetCoordinates
+          invalidatePlanOnNoHighest: false # pls no
+
+    # Ts sucks i wish i could inline this. However if this branch succeeds, no future branch will be seen apparently??
+    - !type:HTNCompoundTask
+      task: KsOperativeFinaliseRetreatCompound
+
+- type: htnCompound
+  id: KsOperativeFinaliseRetreatCompound
+  branches:
+  - preconditions:
+    - !type:KeyExistsPrecondition
+      key: RetreatTargetCoordinates
+    tasks: # Do the retreat
+    - !type:HTNPrimitiveTask
+      operator: !type:MoveToOperator
+        removeKeyOnFinish: true
+        stopOnLineOfSight: false
+        shutdownState: PlanFinished
+        targetKey: RetreatTargetCoordinates
+        pathfindKey: RetreatTargetPathfind
+        rangeKey: CampingRange
+
+- type: utilityQuery
+  id: KsOperativeRetreatableCampingMarkers
+  query:
+  - !type:ComponentQuery
+    components:
+    - type: NpcCampingSpot
+  considerations:
+  - !type:KeyCoordinatesDistanceCon
+    key: OwnerCoordinates
+    curve: !type:PresetCurve
+      preset: KsTargetDistanceLessClose
+  - !type:CoordinatesInFOVCon # Don't go in the direction of the target ffs
+    curve: !type:InverseBoolCurve
+    toKey: LastTargetCoordinates
+    angle: 65
+  - !type:CoordinatesInLOSCon # Dont go to markers that have LOS of where the target was
+    curve: !type:InverseBoolCurve
+      lowScore: 0.1 # not a total discouragement
+    toKey: LastTargetCoordinates
+    radius: 15

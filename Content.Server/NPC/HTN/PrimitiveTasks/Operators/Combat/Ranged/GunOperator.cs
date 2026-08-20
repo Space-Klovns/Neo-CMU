@@ -76,6 +76,8 @@ public sealed partial class GunOperator : HTNOperator, IHtnConditionalShutdown
         {
             ranged.SoundTargetInLOS = losSound;
         }
+
+        ranged.Inaccuracy = System.Math.Clamp(blackboard.GetValueOrDefault<float>("RangedInaccuracy", _entManager), 0f, 1f);
     }
 
     public void ConditionalShutdown(NPCBlackboard blackboard)

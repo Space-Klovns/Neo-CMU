@@ -61,4 +61,8 @@ public sealed partial class NPCRangedCombatComponent : Component
     /// </summary>
     [ViewVariables(VVAccess.ReadWrite)]
     public SoundSpecifier? SoundTargetInLOS;
+
+    /// <summary>Chance (0-1) for an NPC shot to be deliberately scattered off target.</summary>
+    [ViewVariables(VVAccess.ReadWrite)]
+    public float Inaccuracy;
 }

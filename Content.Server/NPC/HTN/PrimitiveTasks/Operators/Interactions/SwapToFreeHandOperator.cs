@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Content.Server.Hands.Systems;
-using Content.Shared.Hands.Components;
+using Content.Shared.Inventory.VirtualItem;
 
 namespace Content.Server.NPC.HTN.PrimitiveTasks.Operators.Interactions;
 
@@ -15,8 +15,7 @@ public sealed partial class SwapToFreeHandOperator : HTNOperator
 
     public override async Task<(bool Valid, Dictionary<string, object>? Effects)> Plan(NPCBlackboard blackboard, CancellationToken cancelToken)
     {
-        if (!blackboard.TryGetValue<List<string>>(NPCBlackboard.FreeHands, out var hands, _entManager) ||
-            !_entManager.TryGetComponent<HandsComponent>(blackboard.GetValue<EntityUid>(NPCBlackboard.Owner), out var handsComp))
+        if (!blackboard.TryGetValue<List<string>>(NPCBlackboard.FreeHands, out var hands, _entManager))
         {
             return (false, null);
         }
@@ -26,7 +25,7 @@ public sealed partial class SwapToFreeHandOperator : HTNOperator
             return (true, new Dictionary<string, object>()
             {
                 {
-                    NPCBlackboard.ActiveHand, handsComp.Hands[hand]
+                    NPCBlackboard.ActiveHand, hand
                 },
                 {
                     NPCBlackboard.ActiveHandFree, true
@@ -39,15 +38,24 @@ public sealed partial class SwapToFreeHandOperator : HTNOperator
 
     public override HTNOperatorStatus Update(NPCBlackboard blackboard, float frameTime)
     {
-        // TODO: Need interaction cooldown
+        // Select the same hand recorded during planning so later preconditions see
+        // the real active hand, not merely the planned one.
         var owner = blackboard.GetValue<EntityUid>(NPCBlackboard.Owner);
-        var handSystem = _entManager.System<HandsSystem>();
+        if (!blackboard.TryGetValue<string>(NPCBlackboard.ActiveHand, out var hand, _entManager))
+            return HTNOperatorStatus.Failed;
 
-        if (!handSystem.TrySelectEmptyHand(owner))
+        var handSystem = _entManager.System<HandsSystem>();
+        // KS reloads deliberately select the hand occupied by a wield virtual item.
+        // The following WaitTickOperator lets that queued virtual item clear before
+        // the inventory magazine is equipped into this hand.
+        if (handSystem.TryGetHeldItem(owner, hand, out var held) &&
+            !_entManager.HasComponent<VirtualItemComponent>(held))
         {
             return HTNOperatorStatus.Failed;
         }
 
-        return HTNOperatorStatus.Finished;
+        return handSystem.TrySetActiveHand(owner, hand)
+            ? HTNOperatorStatus.Finished
+            : HTNOperatorStatus.Failed;
     }
 }

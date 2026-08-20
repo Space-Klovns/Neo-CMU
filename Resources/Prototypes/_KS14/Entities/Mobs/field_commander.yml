@@ -1,0 +1,14 @@
+- type: entity
+  parent: BaseMob
+  id: KsFieldCommander
+  name: field commander
+  description: A remote commander equipped to select and direct HTN combatants.
+  categories: [ HideSpawnMenu ]
+  components:
+  - type: FieldCommander
+  - type: Actions
+  - type: ActionGrant
+    actions:
+    - KsFcActionToggleSelection
+    - KsFcActionMoveSelection
+    - KsFcActionClearSelection
